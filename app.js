@@ -771,7 +771,7 @@ function ChatRoomJoin(data, socket) {
 									socket.join("chatroom-" + ChatRoom[C].ID);
 									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
 									ChatRoomSyncToMember(ChatRoom[C], Acc.MemberNumber, Acc.MemberNumber);
-									ChatRoomSyncMemberJoin(ChatRoom[C], Acc.MemberNumber);
+									ChatRoomSyncMemberJoin(ChatRoom[C], Acc);
 									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber}]);
 									return;
 								} else {
@@ -1018,30 +1018,16 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 }
 
 // Sends the newly joined player to all chat room members
-function ChatRoomSyncMemberJoin(CR, SourceMemberNumber) {
+function ChatRoomSyncMemberJoin(CR, Character) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
-	let joinData = { }
-	joinData.SourceMemberNumber = SourceMemberNumber
-	joinData.Character = null
+	let joinData = {
+		SourceMemberNumber: Character.MemberNumber,
+		Character
+	};
 
-	// Adds the characters from the room
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		if(CR.Account[i].MemberNumber == SourceMemberNumber) // If the player is the one who just joined...
-		{
-			//Remember character and break loop
-			joinData.Character = ChatRoomSyncGetCharSharedData(CR.Account[i])
-			break;
-		}
-	}
-
-	// Sends the full packet to everyone in the room
-	if(joinData.Character != null) // If we found a character...
-	{
-		if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-			IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
-	}
+	if (!ChatRoomSyncToOldClients(CR, Character.MemberNumber))
+		Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
 }
 
 // Sends the left player to all chat room members
