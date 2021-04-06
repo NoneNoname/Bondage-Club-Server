@@ -907,9 +907,9 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 	return A;
 }
 
-// Syncs the room data with all of it's members
-function ChatRoomSync(CR, SourceMemberNumber) {
-
+// Returns a ChatRoom data that can be synced to clients
+function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
+{
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
@@ -926,44 +926,30 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 		Locked: CR.Locked,
 		Private: CR.Private,
 		BlockCategory: CR.BlockCategory,
-		Character: []
 	};
 
-	// Adds the characters from the room
-	for (let C = 0; C < CR.Account.length; C++)
-		R.Character.push(ChatRoomSyncGetCharSharedData(CR.Account[C]));
+	if (IncludeCharacters) {
+		R.Character = [];
 
-	// Sends the full packet to everyone in the room
-	IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", R);
+		for (let C = 0; C < CR.Account.length; C++)
+			R.Character.push(ChatRoomSyncGetCharSharedData(CR.Account[C]));
+	}
 }
 
+// Syncs the room data with all of it's members
+function ChatRoomSync(CR, SourceMemberNumber) {
+
+	// Exits right away if the chat room was destroyed
+	if (CR == null) return;
+
+	// Sends the full packet to everyone in the room
+	IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber, true));
+}
 
 // Syncs the room data with all of it's members
 function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) { return; }
-
-	// Builds the room data
-	let roomData = {};
-	roomData.Name = CR.Name;
-	roomData.Description = CR.Description;
-	roomData.Admin = CR.Admin;
-	roomData.Ban = CR.Ban;
-	roomData.Background = CR.Background;
-	roomData.Limit = CR.Limit;
-	roomData.Game = CR.Game;
-	roomData.SourceMemberNumber = SourceMemberNumber;
-	roomData.Locked = CR.Locked;
-	roomData.Private = CR.Private;
-	roomData.BlockCategory = CR.BlockCategory;
-
-	// Adds the characters from the room
-	roomData.Character = [];
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		//Push character to room data
-		roomData.Character.push(ChatRoomSyncGetCharSharedData(CR.Account[i]));
-	}
 
 	// Sends the full packet to everyone in the room
 	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
@@ -971,18 +957,20 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 		if(CR.Account[i].MemberNumber == TargetMemberNumber) // If the player is the one who gets synced...
 		{
 			// Send room data and break loop
-			CR.Account[i].Socket.emit("ChatRoomSync", roomData);
+			CR.Account[i].Socket.emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber, true));
 			break;
 		}
 	}
 }
 
 // TODO: remove this and every use of it after R67 release
-function ChatRoomSyncToOldClients(CR, SourceMemberNumber) {
+function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
 	if (CR == null) { return; }
 
 	if (CR.Account.some(C => C.OnlineSharedSettings?.GameVersion == "R66")) {
-		ChatRoomSync(CR, SourceMemberNumber);
+		const roomData = ChatRoomGetData(CR, SourceMemberNumber, true);
+		if (Source) Source.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
+		else IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
 		return true;
 	}
 
@@ -994,54 +982,34 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
+	const Target = CR.Account.find(Acc => Acc.MemberNumber === TargetMemberNumber);
+	if (!Target) return;
+	const Source = CR.Account.find(Acc => Acc.MemberNumber === SourceMemberNumber)
+	if (!Source) return;
+
 	let characterData = { }
 	characterData.SourceMemberNumber = SourceMemberNumber
-	characterData.Character = null
+	characterData.Character = ChatRoomSyncGetCharSharedData(Target);
 
-	// Adds the characters from the room
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		if(CR.Account[i].MemberNumber === TargetMemberNumber) // If the player is the one we want to update...
-		{
-			//Remember character and break loop
-			characterData.Character = ChatRoomSyncGetCharSharedData(CR.Account[i])
-			break;
-		}
-	}
-
-	// Sends the full packet to everyone in the room
-	if(characterData.Character != null) // If we found a character...
-	{
-		if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-			IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncCharacter", characterData);
-	}
+	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source))
+		Source.to("chatroom-" + CR.ID).emit("ChatRoomSyncCharacter", characterData);
 }
 
 // Sends the newly joined player to all chat room members
 function ChatRoomSyncMemberJoin(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
+
+	const Source = CR.Account.find(Acc => Acc.MemberNumber === SourceMemberNumber)
+	if (!Source) return;
+
 	let joinData = { }
-	joinData.SourceMemberNumber = SourceMemberNumber
-	joinData.Character = null
+	joinData.SourceMemberNumber = SourceMemberNumber;
+	joinData.Character = ChatRoomSyncGetCharSharedData(Source);
 
-	// Adds the characters from the room
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		if(CR.Account[i].MemberNumber == SourceMemberNumber) // If the player is the one who just joined...
-		{
-			//Remember character and break loop
-			joinData.Character = ChatRoomSyncGetCharSharedData(CR.Account[i])
-			break;
-		}
-	}
 
-	// Sends the full packet to everyone in the room
-	if(joinData.Character != null) // If we found a character...
-	{
-		if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-			IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
-	}
+	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source))
+		Source.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
 }
 
 // Sends the left player to all chat room members
@@ -1062,23 +1030,9 @@ function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
-	// Builds the room data
-	let roomData = {};
-	roomData.Name = CR.Name;
-	roomData.Description = CR.Description;
-	roomData.Admin = CR.Admin;
-	roomData.Ban = CR.Ban;
-	roomData.Background = CR.Background;
-	roomData.Limit = CR.Limit;
-	roomData.Game = CR.Game;
-	roomData.SourceMemberNumber = SourceMemberNumber;
-	roomData.Locked = CR.Locked;
-	roomData.Private = CR.Private;
-	roomData.BlockCategory = CR.BlockCategory;
-
 	// Sends the full packet to everyone in the room
 	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", roomData);
+		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", ChatRoomGetData(CR, SourceMemberNumber, false));
 }
 
 // Syncs the room data with all of it's members
