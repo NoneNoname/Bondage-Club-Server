@@ -1000,13 +1000,13 @@ function ChatRoomSyncMemberJoin(CR, Character) {
 	if (CR == null) return;
 	let joinData = {
 		SourceMemberNumber: Character.MemberNumber,
-		ChatRoomSyncGetCharSharedData(Character)
+		Character: ChatRoomSyncGetCharSharedData(Character)
 	};
 
-	if (!ChatRoomSyncToOldClients(CR, Character.MemberNumber, Character))
-		Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
+	Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
 
-	ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
+	if (!ChatRoomSyncToOldClients(CR, Character.MemberNumber))
+		ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
 }
 
 // Sends the left player to all chat room members
