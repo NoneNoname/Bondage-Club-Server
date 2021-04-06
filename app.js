@@ -968,7 +968,7 @@ function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
 
 	if (CR.Account.some(C => C.OnlineSharedSettings?.GameVersion == "R66")) {
 		const roomData = ChatRoomGetData(CR, SourceMemberNumber, true);
-		if (Source) Source.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
+		if (Source) Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
 		else IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
 		return true;
 	}
@@ -991,7 +991,7 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 	characterData.Character = ChatRoomSyncGetCharSharedData(Target);
 
 	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source))
-		Source.to("chatroom-" + CR.ID).emit("ChatRoomSyncCharacter", characterData);
+		Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncCharacter", characterData);
 }
 
 // Sends the newly joined player to all chat room members
