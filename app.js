@@ -770,7 +770,6 @@ function ChatRoomJoin(data, socket) {
 									ChatRoom[C].Account.push(Acc);
 									socket.join("chatroom-" + ChatRoom[C].ID);
 									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-									ChatRoomSyncToMember(ChatRoom[C], Acc.MemberNumber, Acc.MemberNumber);
 									ChatRoomSyncMemberJoin(ChatRoom[C], Acc);
 									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber}]);
 									return;
@@ -1026,8 +1025,11 @@ function ChatRoomSyncMemberJoin(CR, Character) {
 		Character
 	};
 
-	if (!ChatRoomSyncToOldClients(CR, Character.MemberNumber))
-		Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
+	Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
+	// TODO: Cleanup R67
+	if (!ChatRoomSyncToOldClients(CR, Character.MemberNumber)) {
+		ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
+	}
 }
 
 // Sends the left player to all chat room members
