@@ -770,8 +770,7 @@ function ChatRoomJoin(data, socket) {
 									ChatRoom[C].Account.push(Acc);
 									socket.join("chatroom-" + ChatRoom[C].ID);
 									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-									ChatRoomSyncToMember(ChatRoom[C], Acc.MemberNumber, Acc.MemberNumber);
-									ChatRoomSyncMemberJoin(ChatRoom[C], Acc.MemberNumber);
+									ChatRoomSyncMemberJoin(ChatRoom[C], Acc);
 									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber}]);
 									return;
 								} else {
@@ -996,20 +995,18 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 }
 
 // Sends the newly joined player to all chat room members
-function ChatRoomSyncMemberJoin(CR, SourceMemberNumber) {
+function ChatRoomSyncMemberJoin(CR, Character) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
+	let joinData = {
+		SourceMemberNumber: Character.MemberNumber,
+		ChatRoomSyncGetCharSharedData(Character)
+	};
 
-	const Source = CR.Account.find(Acc => Acc.MemberNumber === SourceMemberNumber)
-	if (!Source) return;
+	if (!ChatRoomSyncToOldClients(CR, Character.MemberNumber, Character))
+		Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
 
-	let joinData = { }
-	joinData.SourceMemberNumber = SourceMemberNumber;
-	joinData.Character = ChatRoomSyncGetCharSharedData(Source);
-
-
-	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source))
-		Source.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
+	ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
 }
 
 // Sends the left player to all chat room members
