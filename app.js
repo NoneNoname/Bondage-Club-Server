@@ -928,11 +928,10 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 	};
 
 	if (IncludeCharacters) {
-		R.Character = [];
-
-		for (let C = 0; C < CR.Account.length; C++)
-			R.Character.push(ChatRoomSyncGetCharSharedData(CR.Account[C]));
+		R.Character = CR.Account.map(ChatRoomSyncGetCharSharedData);
 	}
+
+	return R;
 }
 
 // Syncs the room data with all of it's members
